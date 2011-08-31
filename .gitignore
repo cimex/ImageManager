@@ -1,0 +1,17 @@
+#VISUAL STUDIO IGNORE FILES
+
+[Oo]bj
+[Bb]in
+*.user
+*.suo
+*.[Cc]ache
+*.bak
+*.ncb
+*.log 
+*.DS_Store
+*.svn
+[Tt]humbs.db 
+_ReSharper.*
+*.resharper
+Ankh.NoLoad
+ReSharper.user
