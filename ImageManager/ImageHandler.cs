@@ -18,10 +18,10 @@ namespace ImageManager
 			switch (imageMod)
 			{
 				case ImageMod.Raw:
-					bitmap = service.Get(fileName, maxSize);
+					bitmap = string.IsNullOrEmpty(QueryString["MaxSize"]) ? service.Get(fileName, maxWidth, maxHeight) : service.Get(fileName, maxSize);
 					break;
 				case ImageMod.SpecifiedCrop:
-					bitmap = service.GetAndCrop(fileName, width, height, widthRatio ,heightRatio, leftRatio, topRatio);
+					bitmap = service.GetAndCrop(fileName, width, height, widthRatio, heightRatio, leftRatio, topRatio);
 					break;
 				default:
 					if (cacheEnabled)
@@ -36,6 +36,8 @@ namespace ImageManager
 			}
 
 			writeOutput(bitmap);
+
+			bitmap.Dispose();
 		}
 
 
@@ -47,14 +49,42 @@ namespace ImageManager
 
 		private void writeOutput(Bitmap bitmap)
 		{
-			var memStream = new MemoryStream();
+			using (var memStream = new MemoryStream())
+			{
+				bitmap.MakeTransparent(Color.Fuchsia);
+				switch (outputFormat)
+				{
+					case OutputFormat.Jpeg:
+						context.Response.ContentType = "image/jpeg";
+						bitmap.Save(memStream, ImageFormat.Jpeg);
+						break;
+					case OutputFormat.Gif:
+						context.Response.ContentType = "image/gif";
+						bitmap.Save(memStream, ImageFormat.Gif);
+						break;
+					case OutputFormat.Png:
+						context.Response.ContentType = "image/png";
+						bitmap.Save(memStream, ImageFormat.Png);
+						break;
+					case OutputFormat.HighQualityJpeg:
+						context.Response.ContentType = "image/jpeg";
+						var p = new EncoderParameters(1);
+						p.Param[0] = new EncoderParameter(Encoder.Quality, (long)95);
+						bitmap.Save(memStream, GetImageCodeInfo("image/jpeg"), p);
+						break;
+				}
 
-			context.Response.ContentType = "image/png";
-			bitmap.MakeTransparent(Color.Fuchsia);
-			bitmap.Save(memStream, ImageFormat.Png);
+				setClientCaching();
+				memStream.WriteTo(context.Response.OutputStream);
+			}
+		}
 
-			setClientCaching();
-			memStream.WriteTo(context.Response.OutputStream);
+		private static ImageCodecInfo GetImageCodeInfo(string mimeType)
+		{
+			ImageCodecInfo[] info = ImageCodecInfo.GetImageEncoders();
+			foreach (ImageCodecInfo ici in info)
+				if (ici.MimeType.Equals(mimeType, StringComparison.OrdinalIgnoreCase)) return ici;
+			return null;
 		}
 
 		private void setClientCaching()
@@ -77,7 +107,7 @@ namespace ImageManager
 			{
 				var value = parseStringKeyValue("ImageMod", false);
 				if (string.IsNullOrEmpty(value)) return ImageMod.Scale;
-				return (ImageMod) Enum.Parse(typeof (ImageMod), value);
+				return (ImageMod)Enum.Parse(typeof(ImageMod), value);
 			}
 		}
 
@@ -98,22 +128,24 @@ namespace ImageManager
 
 		protected int height
 		{
-			get
-			{
-				return parseIntegerKeyValue("Height");
-			}
+			get { return parseIntegerKeyValue("Height"); }
 		}
 		protected int width
 		{
-			get
-			{
-				return parseIntegerKeyValue("Width");
-			}
+			get { return parseIntegerKeyValue("Width"); }
 		}
 
 		protected int maxSize
 		{
 			get { return parseIntegerKeyValue("MaxSize"); }
+		}
+		protected int maxWidth
+		{
+			get { return parseIntegerKeyValue("MaxWidth"); }
+		}
+		protected int maxHeight
+		{
+			get { return parseIntegerKeyValue("MaxHeight"); }
 		}
 
 		protected double topRatio
@@ -135,7 +167,15 @@ namespace ImageManager
 			get { return parseDoubleKeyValue("heightRatio"); }
 		}
 
-
+		protected OutputFormat outputFormat
+		{
+			get
+			{
+				var value = parseStringKeyValue("OutputFormat", false);
+				if (string.IsNullOrEmpty(value)) return OutputFormat.Png;
+				return (OutputFormat)Enum.Parse(typeof(OutputFormat), value);
+			}
+		}
 
 		protected string fileName
 		{
@@ -144,7 +184,7 @@ namespace ImageManager
 				var value = parseStringKeyValue("FileName", false);
 				return string.IsNullOrEmpty(value) ? "Default" : value;
 			}
-		}	
+		}
 
 		#region parsers
 		private bool parseBoolKeyValue(string key)
@@ -174,7 +214,7 @@ namespace ImageManager
 		private string parseStringKeyValue(string key, bool isMandatory)
 		{
 			var value = QueryString[key];
-			if (string.IsNullOrEmpty(value) & isMandatory) 
+			if (string.IsNullOrEmpty(value) & isMandatory)
 				throw new ArgumentException(string.Format(missingQueryStringKeyValuePairMessage, key));
 			return value;
 		}
