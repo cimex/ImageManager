@@ -78,7 +78,7 @@ namespace ImageManagerTest
 			var width = 600;
 			var height = 30;
 			Assert.That(context.Cache.Count == 0);
-			var image = service.GetCached(fileName, width, height, ImageMod.Scale, "FFAADD", null);
+			var image = service.GetCached(fileName, width, height, ImageMod.Scale, "FFAADD", null, OutputFormat.Png);
 			Assert.That(context.Cache.Count > 0);
 
 			foreach (DictionaryEntry cacheItem in context.Cache)
@@ -86,7 +86,7 @@ namespace ImageManagerTest
 				Debug.WriteLine(cacheItem.Key);
 			}
 
-			image = service.GetCached(fileName, width, height, ImageMod.Scale, "FFAADD", null);
+			image = service.GetCached(fileName, width, height, ImageMod.Scale, "FFAADD", null, OutputFormat.Png);
 			Assert.That(image, Is.Not.Null);
 		}
 

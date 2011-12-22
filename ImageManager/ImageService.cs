@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Web;
 using System.Web.Caching;
 
@@ -57,12 +58,17 @@ namespace ImageManager
 			return thumbBmp;
 		}
 
+		public byte[] Get(string relativeFilePath, int width, int height, ImageMod imageMod, string hexBackgroundColour, AnchorPosition? anchor, OutputFormat outputFormat)
+		{
+			using (var bitmap = Get(relativeFilePath, width, height, imageMod, hexBackgroundColour, anchor))
+			{
+				return bitmap.GetBytes(outputFormat);
+			}
+		}
 		public Bitmap Get(string relativeFilePath, int width, int height, ImageMod imageMod, string hexBackgroundColour, AnchorPosition? anchor)
 		{
-			using (var image = (relativeFilePath == "Default" ? getDefault(width, height) : loadImage(relativeFilePath)) ?? getDefault(width, height))
+			using (var image = (relativeFilePath == "Default" ? getDefault(width, height) : loadImage(relativeFilePath) ?? getDefault(width, height)))
 			{
-				if (image == null) return getDefault(width, height);
-
 				switch (imageMod)
 				{
 					case ImageMod.Scale:
@@ -75,6 +81,13 @@ namespace ImageManager
 			}
 		}
 
+		public byte[] Get(string relativeFilePath, int maxSideSize, OutputFormat outputFormat)
+		{
+			using (var bitmap = Get(relativeFilePath, maxSideSize))
+			{
+				return bitmap.GetBytes(outputFormat);
+			}
+		}
 		public Bitmap Get(string relativeFilePath, int maxSideSize)
 		{
 			Func<int, Image> defaultImage = maxSize => getDefault(maxSize, maxSize);
@@ -107,6 +120,13 @@ namespace ImageManager
 			return bitmap;
 		}
 
+		public byte[] Get(string relativeFilePath, int maxWidth, int maxHeight, OutputFormat outputFormat)
+		{
+			using (var bitmap = Get(relativeFilePath, maxWidth, maxHeight))
+			{
+				return bitmap.GetBytes(outputFormat);
+			}
+		}
 		public Bitmap Get(string relativeFilePath, int maxWidth, int maxHeight)
 		{
 			var image = (relativeFilePath == "Default" ? getDefault(maxWidth, maxHeight) :
@@ -156,16 +176,16 @@ namespace ImageManager
 			return defaultImage;
 		}
 
-		public Bitmap GetCached(string relativeFilePath, int width, int height, ImageMod imageMod, string hexBackgroundColour, AnchorPosition? anchor)
+		public byte[] GetCached(string relativeFilePath, int width, int height, ImageMod imageMod, string hexBackgroundColour, AnchorPosition? anchor, OutputFormat outputFormat)
 		{
-			var key = "ImageManager-" + relativeFilePath + width + height + Enum.GetName(typeof(ImageMod), imageMod);
+			var key = string.Format("ImageManager-{0}-{1}-{2}-{3}-{4}", relativeFilePath, width, height, imageMod, outputFormat);
 			if (Context.Cache[key] == null)
 			{
-				var image = Get(relativeFilePath, width, height, imageMod, hexBackgroundColour, anchor);
+				var image = Get(relativeFilePath, width, height, imageMod, hexBackgroundColour, anchor, outputFormat);
 				if (image == null) throw new FileNotFoundException("The image requested does not exist.");
 				Context.Cache.Insert(key, image, null, Cache.NoAbsoluteExpiration, Configs.CacheExpiration);
 			}
-			return Context.Cache[key] as Bitmap;
+			return (byte[])Context.Cache[key];
 		}
 
 		public void Delete(string fullFilePath)
@@ -174,6 +194,15 @@ namespace ImageManager
 			{
 				File.Delete(fullFilePath);
 			}
+		}
+
+		///<summary> 
+		/// This returns a specified crop
+		/// </summary>
+		/// <param name="relativeFilePath">e.g. asdf/asdf.jpg</param>
+		public byte[] GetAndCrop(string relativeFilePath, int targetWidth, int targetHeight, double widthRatio, double heightRatio, double leftRatio, double topRatio, OutputFormat outputFormat)
+		{
+			return GetAndCrop(relativeFilePath, targetWidth, targetHeight, widthRatio, heightRatio, leftRatio, topRatio).GetBytes(outputFormat);
 		}
 
 		///<summary> 
@@ -273,7 +302,7 @@ namespace ImageManager
 
 			var grPhoto = Graphics.FromImage(bmPhoto);
 
-			grPhoto.Clear(Color.Fuchsia);
+			grPhoto.Clear(Utilities.BackgroundColour);
 			grPhoto.PixelOffsetMode = PixelOffsetMode.HighQuality;
 			grPhoto.CompositingQuality = CompositingQuality.HighQuality;
 			grPhoto.InterpolationMode = InterpolationMode.HighQualityBicubic;
@@ -300,7 +329,7 @@ namespace ImageManager
 
 			var grPhoto = Graphics.FromImage(bitmap);
 
-			var backgroundColour = Color.Fuchsia;
+			var backgroundColour = Utilities.BackgroundColour;
 			if (!string.IsNullOrEmpty(hexBackgroundColour))
 			{
 				backgroundColour = getColour(hexBackgroundColour);

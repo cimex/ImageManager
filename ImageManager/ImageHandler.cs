@@ -14,77 +14,25 @@ namespace ImageManager
 			this.context = context;
 			var service = new ImageService(context);
 
-			Bitmap bitmap;
+			setContentType();
+			setClientCaching();
+			
 			switch (imageMod)
 			{
 				case ImageMod.Raw:
-					bitmap = string.IsNullOrEmpty(QueryString["MaxSize"]) ? service.Get(fileName, maxWidth, maxHeight) : service.Get(fileName, maxSize);
+					context.Response.BinaryWrite(string.IsNullOrEmpty(QueryString["MaxSize"])
+													? service.Get(fileName, maxWidth, maxHeight, outputFormat)
+													: service.Get(fileName, maxSize, outputFormat));
 					break;
 				case ImageMod.SpecifiedCrop:
-					bitmap = service.GetAndCrop(fileName, width, height, widthRatio, heightRatio, leftRatio, topRatio);
+					context.Response.BinaryWrite(service.GetAndCrop(fileName, width, height, widthRatio, heightRatio, leftRatio, topRatio, outputFormat));
 					break;
 				default:
-					if (cacheEnabled)
-					{
-						bitmap = service.GetCached(fileName, width, height, imageMod, hexBackGroundColour, anchor);
-					}
-					else
-					{
-						bitmap = service.Get(fileName, width, height, imageMod, hexBackGroundColour, anchor) ?? getDefaultImage();
-					}
+					context.Response.BinaryWrite(cacheEnabled
+					                             	? service.GetCached(fileName, width, height, imageMod, hexBackGroundColour, anchor, outputFormat)
+					                             	: service.Get(fileName, width, height, imageMod, hexBackGroundColour, anchor, outputFormat));
 					break;
 			}
-
-			writeOutput(bitmap);
-
-			bitmap.Dispose();
-		}
-
-
-
-		protected bool cacheEnabled
-		{
-			get { return parseBoolKeyValue("CacheEnabled"); }
-		}
-
-		private void writeOutput(Bitmap bitmap)
-		{
-			using (var memStream = new MemoryStream())
-			{
-				bitmap.MakeTransparent(Color.Fuchsia);
-				switch (outputFormat)
-				{
-					case OutputFormat.Jpeg:
-						context.Response.ContentType = "image/jpeg";
-						bitmap.Save(memStream, ImageFormat.Jpeg);
-						break;
-					case OutputFormat.Gif:
-						context.Response.ContentType = "image/gif";
-						bitmap.Save(memStream, ImageFormat.Gif);
-						break;
-					case OutputFormat.Png:
-						context.Response.ContentType = "image/png";
-						bitmap.Save(memStream, ImageFormat.Png);
-						break;
-					case OutputFormat.HighQualityJpeg:
-						context.Response.ContentType = "image/jpeg";
-						var p = new EncoderParameters(1);
-						p.Param[0] = new EncoderParameter(Encoder.Quality, (long)95);
-						bitmap.Save(memStream, GetImageCodeInfo("image/jpeg"), p);
-						break;
-				}
-
-				setClientCaching();
-				memStream.WriteTo(context.Response.OutputStream);
-			}
-		}
-
-		private static ImageCodecInfo GetImageCodeInfo(string mimeType)
-		{
-			ImageCodecInfo[] info = ImageCodecInfo.GetImageEncoders();
-			foreach (ImageCodecInfo ici in info)
-				if (ici.MimeType.Equals(mimeType, StringComparison.OrdinalIgnoreCase)) return ici;
-			return null;
 		}
 
 		private void setClientCaching()
@@ -92,6 +40,16 @@ namespace ImageManager
 			var cacheType = disableClientCache ? HttpCacheability.NoCache : HttpCacheability.Public;
 			context.Response.Cache.SetCacheability(cacheType);
 			context.Response.Cache.SetExpires(DateTime.Now.AddMinutes(5));
+		}
+
+		private void setContentType()
+		{
+			context.Response.ContentType = Utilities.GetContentType(outputFormat);
+		}
+
+		protected bool cacheEnabled
+		{
+			get { return parseBoolKeyValue("CacheEnabled"); }
 		}
 
 		protected bool disableClientCache
@@ -229,10 +187,6 @@ namespace ImageManager
 		protected NameValueCollection QueryString
 		{
 			get { return context.Request.QueryString; }
-		}
-		private Bitmap getDefaultImage()
-		{
-			throw new NotImplementedException("No default image has been specified.");
 		}
 		public bool IsReusable
 		{
