@@ -27,7 +27,8 @@ namespace ImageManagerTest
         [Test]
         public void should_save_image()
         {
-            IImageService service = new ImageService(context);
+			IFileService fileService = new FileService(context);
+            IImageService service = new ImageService(fileService, context);
             var isSaved = service.SaveForWeb(fileName, imageDirectory, targetDirectory);
             Assert.That(isSaved); 
         }
@@ -36,7 +37,8 @@ namespace ImageManagerTest
         [Test]
         public void should_save_image_and_create_new_directory()
         {
-            IImageService service = new ImageService(context);
+			IFileService fileService = new FileService(context);
+			IImageService service = new ImageService(fileService, context);
             var isSaved = service.SaveForWeb(fileName, rawfilePath, targetDirectory);
             Assert.That(isSaved);
 
@@ -48,7 +50,8 @@ namespace ImageManagerTest
         public void should_get_image()
         {
 			context.Application.Set("Path",imageDirectory);
-            IImageService service = new ImageService(context);
+			IFileService fileService = new FileService(context);
+			IImageService service = new ImageService(fileService, context);
             var width = 100;
             var height = 300;
 
@@ -62,7 +65,8 @@ namespace ImageManagerTest
 		[Test]
 		public void should_delete_image()
 		{
-			IImageService service = new ImageService(context);
+			IFileService fileService = new FileService(context);
+			IImageService service = new ImageService(fileService, context);
 			service.Delete(fileName);
 			var image = service.Get(fileName, 100, 100, ImageMod.Scale, "FFAADD", null);
 			Assert.That(image, Is.Null);
@@ -73,7 +77,8 @@ namespace ImageManagerTest
 		[Test]
 		public void should_get_cached_image()
 		{
-			IImageService service = new ImageService(context);
+			IFileService fileService = new FileService(context);
+			IImageService service = new ImageService(fileService, context);
 
 			var width = 600;
 			var height = 30;
@@ -94,7 +99,8 @@ namespace ImageManagerTest
 		[Test]
 		public void should_get_cropped_image()
 		{
-			IImageService service = new ImageService(context);
+			IFileService fileService = new FileService(context);
+			IImageService service = new ImageService(fileService, context);
 			var width = 100;
 			var height = 200;
 

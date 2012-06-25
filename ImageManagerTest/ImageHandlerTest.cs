@@ -10,7 +10,7 @@ namespace ImageManagerTest
 	[TestFixture]
 	public class ImageHandlerTest
 	{
-		public void should_get_image()
+		/*public void should_get_image()
 		{
 
 			IHttpHandler imageHandler = new ImageHandler();
@@ -27,7 +27,7 @@ namespace ImageManagerTest
 			request.Expect(x => x.QueryString).Return(queryString);
 			
 			imageHandler.ProcessRequest(context);
-		}
+		}*/
 	}
 }
 

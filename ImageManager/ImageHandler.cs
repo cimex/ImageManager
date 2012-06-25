@@ -1,18 +1,18 @@
 using System;
 using System.Collections.Specialized;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
 using System.Web;
 
 namespace ImageManager
 {
 	public class ImageHandler : IHttpHandler
 	{
-		public void ProcessRequest(HttpContext context)
+		private IImageService _imageService;
+
+		public virtual void ProcessRequest(HttpContext context)
 		{
 			this.context = context;
-			var service = new ImageService(context);
+			_imageService = new ImageService(new FileService(context), context);
+
 
 			setContentType();
 			setClientCaching();
@@ -21,28 +21,28 @@ namespace ImageManager
 			{
 				case ImageMod.Raw:
 					context.Response.BinaryWrite(string.IsNullOrEmpty(QueryString["MaxSize"])
-													? service.Get(fileName, maxWidth, maxHeight, outputFormat)
-													: service.Get(fileName, maxSize, outputFormat));
+													? _imageService.Get(fileName, maxWidth, maxHeight, outputFormat)
+													: _imageService.Get(fileName, maxSize, outputFormat));
 					break;
 				case ImageMod.SpecifiedCrop:
-					context.Response.BinaryWrite(service.GetAndCrop(fileName, width, height, widthRatio, heightRatio, leftRatio, topRatio, outputFormat));
+					context.Response.BinaryWrite(_imageService.GetAndCrop(fileName, width, height, widthRatio, heightRatio, leftRatio, topRatio, outputFormat));
 					break;
 				default:
 					context.Response.BinaryWrite(cacheEnabled
-					                             	? service.GetCached(fileName, width, height, imageMod, hexBackGroundColour, anchor, outputFormat)
-					                             	: service.Get(fileName, width, height, imageMod, hexBackGroundColour, anchor, outputFormat));
+					                             	? _imageService.GetCached(fileName, width, height, imageMod, hexBackGroundColour, anchor, outputFormat)
+					                             	: _imageService.Get(fileName, width, height, imageMod, hexBackGroundColour, anchor, outputFormat));
 					break;
 			}
 		}
 
-		private void setClientCaching()
+		protected void setClientCaching()
 		{
 			var cacheType = disableClientCache ? HttpCacheability.NoCache : HttpCacheability.Public;
 			context.Response.Cache.SetCacheability(cacheType);
 			context.Response.Cache.SetExpires(DateTime.Now.AddMinutes(5));
 		}
 
-		private void setContentType()
+		protected void setContentType()
 		{
 			context.Response.ContentType = Utilities.GetContentType(outputFormat);
 		}
@@ -144,8 +144,9 @@ namespace ImageManager
 			}
 		}
 
+		
 		#region parsers
-		private bool parseBoolKeyValue(string key)
+		protected bool parseBoolKeyValue(string key)
 		{
 			var value = QueryString[key];
 			if (string.IsNullOrEmpty(value)) return false;
@@ -153,7 +154,8 @@ namespace ImageManager
 			if (bool.TryParse(value, out result)) return result;
 			throw new ArgumentException(string.Format(nonNumericFormatValueMessage, key));
 		}
-		private int parseIntegerKeyValue(string key)
+
+		protected int parseIntegerKeyValue(string key)
 		{
 			var value = parseStringKeyValue(key, true);
 			int result;
@@ -161,7 +163,7 @@ namespace ImageManager
 			throw new ArgumentException(string.Format(nonNumericFormatValueMessage, key));
 		}
 
-		private double parseDoubleKeyValue(string key)
+		protected double parseDoubleKeyValue(string key)
 		{
 			var value = parseStringKeyValue(key, true);
 			double result;
@@ -169,18 +171,35 @@ namespace ImageManager
 			throw new ArgumentException(string.Format(nonNumericFormatValueMessage, key));
 		}
 
-		private string parseStringKeyValue(string key, bool isMandatory)
+		protected string parseStringKeyValue(string key, bool isMandatory)
 		{
 			var value = QueryString[key];
 			if (string.IsNullOrEmpty(value) & isMandatory)
 				throw new ArgumentException(string.Format(missingQueryStringKeyValuePairMessage, key));
 			return value;
 		}
+
+		protected Guid parseGuidKeyValue(string key)
+		{
+			var value = parseStringKeyValue(key, true);
+			Guid result;
+			try
+			{
+				result = new Guid(value);
+			}
+			catch (Exception)
+			{
+				throw new ArgumentException(string.Format(nonGuidFormatValueMessage, key));
+			}
+			return result;
+		}
+
 		#endregion
 
 		#region error messages
 		private const string missingQueryStringKeyValuePairMessage = "You must provide the {0} for the image.";
 		private const string nonNumericFormatValueMessage = "The value for {0} is not an integer.";
+		private const string nonGuidFormatValueMessage = "The value for {0} is not a guid.";
 		#endregion
 
 		protected HttpContext context { get; set; }
